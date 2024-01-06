@@ -1,3 +1,6 @@
+# Code reference from CrazyCurly
+# Link: https://github.com/Crazycurly/gesture_MeArm/blob/main/arduino/main.ino
+
 #include <Servo.h>
 
 Servo servo[3];
