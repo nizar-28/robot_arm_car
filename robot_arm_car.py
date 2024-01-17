@@ -6,10 +6,9 @@ import serial
 import cv2
 import mediapipe as mp
 
-# config
+# Configuration
 write_video = True
 debug = False
-# cam_source = "http://192.168.1.100:4747/video" # 0,1 for usb cam, "http://192.168.1.165:4747/video" for webcam
 
 if not debug:
     ser = serial.Serial('COM9', 115200)
@@ -17,21 +16,22 @@ if not debug:
 x_min = 0
 x_mid = 90
 x_max = 180
-# use angle between wrist and index finger to control x axis
+
+# Use x-axis distance between wrist and index finger MCP to control x axis
 palm_angle_min = -50
 palm_angle_mid = 20
 
 z_min = 0
 z_mid = 135
 z_max = 180
-# # use palm size to control z axis
+# Use palm size to control z axis
 plam_size_min = 0.1
 plam_size_max = 0.3
 
 claw_open_angle = 90
 claw_close_angle = 180
 
-servo_angle = [x_mid,z_mid,claw_open_angle] # [x, y, claw]
+servo_angle = [x_mid,z_mid,claw_open_angle] # [x, z, claw]
 prev_servo_angle = servo_angle
 fist_threshold = 7
 
@@ -40,7 +40,7 @@ mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
 
-tipIds=[4,8,12,16,20]
+fingertip_keypoints=[4,8,12,16,20]
 total = 0
 
 cap = cv2.VideoCapture(0)
@@ -53,9 +53,9 @@ if write_video:
 clamp = lambda n, minn, maxn: max(min(maxn, n), minn)
 map_range = lambda x, in_min, in_max, out_min, out_max: abs((x - in_min) * (out_max - out_min) // (in_max - in_min) + out_min)
 
-# Check if the hand is a fist
+# Check if it is fist
 def is_fist(hand_landmarks, palm_size):
-    # calculate the distance between the wrist and the each finger tip
+    # calculate the distance between the wrist and the each finger tips divided by palm size and compare with fist_threshold
     distance_sum = 0
     WRIST = hand_landmarks.landmark[0]
     for i in [7,8,11,12,15,16,19,20]:
@@ -68,7 +68,7 @@ def landmark_to_servo_angle(hand_landmarks):
     servo_angle = [x_mid,z_mid,claw_open_angle]
     WRIST = hand_landmarks.landmark[0]
     INDEX_FINGER_MCP = hand_landmarks.landmark[5]
-    # calculate the distance between the wrist and the index finger
+    # Calculate the distance between the wrist and the index finger MCP
     palm_size = ((WRIST.x - INDEX_FINGER_MCP.x)**2 + (WRIST.y - INDEX_FINGER_MCP.y)**2 + (WRIST.z - INDEX_FINGER_MCP.z)**2)**0.5
 
     if is_fist(hand_landmarks, palm_size):
@@ -76,7 +76,7 @@ def landmark_to_servo_angle(hand_landmarks):
     else:
         servo_angle[2] = claw_open_angle
 
-    # calculate x angle
+    # Calculate x-axis distance between wrist and index finger MCP
     distance = palm_size
     angle = (WRIST.x - INDEX_FINGER_MCP.x) / distance  # calculate the radian between the wrist and the index finger
     angle = int(angle * 180 / 3.1415926)               # convert radian to degree
@@ -84,7 +84,7 @@ def landmark_to_servo_angle(hand_landmarks):
     servo_angle[0] = map_range(angle, palm_angle_min, palm_angle_mid, x_max, x_min)
 
 
-    # calculate z angle
+    # Use palm size as z angle
     palm_size = clamp(palm_size, plam_size_min, plam_size_max)
     servo_angle[1] = map_range(palm_size, plam_size_min, plam_size_max, z_max, z_min)
 
@@ -97,7 +97,7 @@ with mp_hands.Hands(model_complexity=0, min_detection_confidence=0.5, min_tracki
     while cap.isOpened():
         success, image = cap.read()
         if not success:
-            print("Ignoring empty camera frame.")
+            print("Please ignore empty camera frame.")
             # If loading a video, use 'break' instead of 'continue'.
             continue
 
@@ -107,7 +107,7 @@ with mp_hands.Hands(model_complexity=0, min_detection_confidence=0.5, min_tracki
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = hands.process(image)
 
-        lmList = []
+        landmark_list = []
 
         # Draw the hand annotations on the image.
         image.flags.writeable = True
@@ -129,7 +129,7 @@ with mp_hands.Hands(model_complexity=0, min_detection_confidence=0.5, min_tracki
                     for id, lm in enumerate(hand_landmarks.landmark):
                         h,w,c=image.shape
                         cx,cy= int(lm.x*w), int(lm.y*h)
-                        lmList.append([id,cx,cy])               
+                        landmark_list.append([id,cx,cy])               
             
                                 
                 mp_drawing.draw_landmarks(
@@ -140,13 +140,13 @@ with mp_hands.Hands(model_complexity=0, min_detection_confidence=0.5, min_tracki
                     mp_drawing_styles.get_default_hand_connections_style())
                 
         fingers = []
-        if len(lmList)!=0:
-            if lmList[tipIds[0]][1] > lmList[tipIds[0]-1][1]:
+        if len(landmark_list)!=0:
+            if landmark_list[fingertip_keypoints[0]][1] > landmark_list[fingertip_keypoints[0]-1][1]:
                 fingers.append(1)
             else:
                 fingers.append(0)
             for id in range(1,5):
-                if lmList[tipIds[id]][2] < lmList[tipIds[id]-2][2]:
+                if landmark_list[fingertip_keypoints[id]][2] < landmark_list[fingertip_keypoints[id]-2][2]:
                     fingers.append(1)
                 else:
                     fingers.append(0)
@@ -156,7 +156,7 @@ with mp_hands.Hands(model_complexity=0, min_detection_confidence=0.5, min_tracki
                 print(total)
                 ser.write(str(total).encode())
          
-        # Flip the image horizontally for a selfie-view display.
+        # Image is flipped horizontally for a selfie-view display
         image = cv2.flip(image, 1)
         # show servo angle
         cv2.putText(image, str(servo_angle), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
@@ -182,13 +182,11 @@ with mp_hands.Hands(model_complexity=0, min_detection_confidence=0.5, min_tracki
 
 
         elif total==3:
-            #cv2.rectangle(image, (20, 300), (270, 425), (0, 255, 0), cv2.FILLED)
             cv2.putText(image, "Left", (10, 375), cv2.FONT_HERSHEY_SIMPLEX,
                 2, (0, 255, 0), 5)
             print("Left")
 
         elif total==4:
-            #cv2.rectangle(image, (20, 300), (270, 425), (0, 255, 0), cv2.FILLED)
             cv2.putText(image, "Backward", (10, 375), cv2.FONT_HERSHEY_SIMPLEX,
                 2, (0, 255, 0), 5)
             print("Backward")
