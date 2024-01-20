@@ -11,7 +11,7 @@ int motor_speed_A = 5;
 int motor_direction_B = 4;
 int motor_speed_B = 6;
 int speed = 50;
-int total =0;
+int total = 0;
 
 void controlCar(int total);
 
@@ -19,7 +19,6 @@ void setup()
 {
     Serial.begin(115200);
     servo[0].attach(11);
-    //servo[1].attach(10);
     servo[1].attach(10);
     servo[2].attach(9);
 
@@ -28,7 +27,6 @@ void setup()
         servo[i].write(default_angle[i]);
     }
 
-    // Initialize DC motor pins
     pinMode(motor_direction_A, OUTPUT);
     pinMode(motor_speed_A, OUTPUT);
     pinMode(motor_direction_B, OUTPUT);
@@ -41,7 +39,7 @@ long t = millis();
 
 void loop()
 {
-    if (Serial.available())
+    if (Serial.available()) // Ensure at least 4 bytes are available for reading
     {
         Serial.readBytes(angle, 3);
         for (size_t i = 0; i < 3; i++)
@@ -68,40 +66,41 @@ void loop()
     }
 }
 
-// Function to control DC motors for car movement
-void controlCar(int total) {
-  if(total==1) {
-      digitalWrite(2,HIGH);
-      analogWrite(5,speed);
-      digitalWrite(4,LOW);
-      analogWrite(6,speed);
-      }
-      
-  else if(total==4) {
-      digitalWrite(2,LOW);
-      analogWrite(5,speed);
-      digitalWrite(4,HIGH);
-      analogWrite(6,speed);
-      }
-
-  else if(total==2) {
-      digitalWrite(2,HIGH);
-      analogWrite(5,speed);
-      digitalWrite(4,HIGH);
-      analogWrite(6,speed);
-      }
-    
-  else if(total==3) {
-      digitalWrite(2,LOW);
-      analogWrite(5,speed);
-      digitalWrite(4,LOW);
-      analogWrite(6,speed);
-      }
-      
-  else if(total==0 || total==5) {
-      digitalWrite(2,LOW);
-      analogWrite(5,0);
-      digitalWrite(4,HIGH);
-      analogWrite(6,0);  
-      }
+void controlCar(int total)
+{
+    if (total == 1)
+    {
+        digitalWrite(motor_direction_A, HIGH);
+        analogWrite(motor_speed_A, speed);
+        digitalWrite(motor_direction_B, LOW);
+        analogWrite(motor_speed_B, speed);
+    }
+    else if (total == 4)
+    {
+        digitalWrite(motor_direction_A, LOW);
+        analogWrite(motor_speed_A, speed);
+        digitalWrite(motor_direction_B, HIGH);
+        analogWrite(motor_speed_B, speed);
+    }
+    else if (total == 2)
+    {
+        digitalWrite(motor_direction_A, HIGH);
+        analogWrite(motor_speed_A, speed);
+        digitalWrite(motor_direction_B, HIGH);
+        analogWrite(motor_speed_B, speed);
+    }
+    else if (total == 3)
+    {
+        digitalWrite(motor_direction_A, LOW);
+        analogWrite(motor_speed_A, speed);
+        digitalWrite(motor_direction_B, LOW);
+        analogWrite(motor_speed_B, speed);
+    }
+    else if (total == 0 || total == 5)
+    {
+        digitalWrite(motor_direction_A, LOW);
+        analogWrite(motor_speed_A, 0);
+        digitalWrite(motor_direction_B, HIGH);
+        analogWrite(motor_speed_B, 0);
+    }
 }
